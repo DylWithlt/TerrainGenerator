@@ -1,21 +1,26 @@
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RNG = Random.new()
-local NOISE_SEED = RNG:NextNumber()
 
 -- Terrain Specific Settings
 local SIZE = 3
-local smoothness = 0.005
-local ZONE_SIZE = 200
-local SEA_LEVEL = 0
 
--- Generation Speed Settings
-local step_size = 50
-local steps = math.ceil(ZONE_SIZE/step_size)
+local CHUNK_SIZE = 21 -- MUST BE ODD
+if CHUNK_SIZE % 2 == 0 then error("TerrainGen Chunk_SIZE can't be even.") return end
+
+local smoothness = 0.005
 
 -- Hexagon Generator
-local Hex = require(script.Hex)(SIZE)
+local HexFactory = require(script.Hex)
+
+local Hex = HexFactory(SIZE)
+local ChunkHex = HexFactory(SIZE * CHUNK_SIZE, true)
+
+local CHUNK_R = math.ceil(CHUNK_SIZE/2) + 1
+
 local hexagon = ReplicatedStorage:WaitForChild("Hexagon")
 
 local biomes = {
@@ -32,7 +37,6 @@ local biomes = {
 local HexagonFolder = Instance.new("Folder")
 HexagonFolder.Name = "HexagonTerrain"
 HexagonFolder.Parent = workspace
-
 
 -- Util functions
 local function pickRandom(tbl)
@@ -69,6 +73,21 @@ local function placeHex(hex)
     return newHex
 end
 
+local function visualizeChunk(chex)
+    local newHex = hexagon:Clone()
+    local worldPos = ChunkHex.hex_to_vec3(chex) + Vector3.new(0, 200, 0)
+
+    newHex.Size = Vector3.new(ChunkHex.h, 200, ChunkHex.w)
+    newHex.CFrame = CFrame.new(worldPos)
+    newHex.Color = Color3.new(255, 0, 0)
+    newHex.Transparency = 0.7
+    newHex.CanCollide = false
+    newHex.CastShadow = false
+    newHex.Material = Enum.Material.ForceField
+    newHex.Parent = workspace
+    return newHex
+end
+
 local function getCloseColors(color)
     local colors = {color}
 
@@ -88,7 +107,6 @@ end
 local elevations, moistures, evaps = 5, 8, 8
 
 local function getBiome(e, m, ev)
-	--local adjusted = (math.noise(hex.q * smoothness, hex.r * smoothness) + -1)/2
     e = (e - 0.4)
     if e <= 0 then return biomes.OCEAN end
     if e < 0.05 then return biomes.DESERT end
@@ -170,26 +188,67 @@ local function genTerrain(hex)
     hex_part.Color = pickRandom(getCloseColors(biome))
 end
 
+local center_height = getHeight(getHeightMap(Hex.new(0,0)))
+
 local spawnPoint = Instance.new("SpawnLocation")
 spawnPoint.Anchored = true
-spawnPoint.CFrame = CFrame.new(0,getHeight(getHeightMap(Hex.new(0,0))),0)
+spawnPoint.CFrame = CFrame.new(0,center_height,0)
 spawnPoint.Parent = workspace
 
-local function generateMap()
-
-    genTerrain(Hex.new(0,0))
-    for map_radius = 0, steps-1 do
-        for i = 1, step_size do
-            local ring = Hex.single_ring(Hex.new(0,0), map_radius * step_size + i)
-            for count, hex in ipairs(ring) do
-                genTerrain(hex)
-                if count % 50 == 0 then
-                    task.wait()
-                end
-            end
-        end
-    end
-    print("Finished generating.")
+local function getChunkCenterAsHex(cHex)
+    return Hex.hex_round(Hex.vec3_to_hex(ChunkHex.hex_to_vec3(cHex)))
 end
 
-generateMap()
+local chunkTracker = {}
+
+local function checkChunkHex(cHex)
+    return chunkTracker[tostring(cHex)]
+end
+
+local function generateChunk(chunkHex)
+    local centerHex = getChunkCenterAsHex(chunkHex)
+
+    if checkChunkHex(chunkHex) then return end
+    chunkTracker[chunkHex] = true
+
+    local spiral = Hex.hex_spiral(centerHex, CHUNK_R)
+    for _, hex in ipairs(spiral) do
+        genTerrain(hex)
+    end
+
+    task.wait()
+end
+
+local lastChunk = {}
+
+RunService.Heartbeat:Connect(function(dt)
+    for _, player in ipairs(Players:GetPlayers()) do
+        local char = player.Character
+        if not char then continue end
+
+        local hrp = char.PrimaryPart
+        if not hrp then continue end
+
+        local lc = lastChunk[player]
+
+        local currChunk = ChunkHex.hex_round(ChunkHex.vec3_to_hex(hrp.CFrame.Position))
+
+        if tostring(currChunk) == tostring(lc) then continue end
+        
+        lc = currChunk
+        print(tostring(currChunk))
+
+        if chunkTracker[tostring(currChunk)] then continue end
+        chunkTracker[tostring(currChunk)] = true
+
+        print("Spiraling")
+        local neighbors = ChunkHex.hex_spiral(currChunk, 1)
+        for _, chunk in ipairs(neighbors) do
+            generateChunk(chunk)
+        end
+    end
+end)
+
+generateChunk(ChunkHex.new(0,0))
+
+
