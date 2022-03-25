@@ -29,6 +29,8 @@ return function(size, pointyUp)
 	Hex.w = 2 * size
 	Hex.h = sqrt_3 * size
 	
+	local M = pointyUp and pointy or flat
+
 	local layout = {
 		orientation = M;
 		size = Vector2.new(size, size);
@@ -37,7 +39,6 @@ return function(size, pointyUp)
 
     Hex.layout = layout
 
-	local M = pointyUp and pointy or flat
 
 	function Hex.new(q, r, s)
 		local self = {

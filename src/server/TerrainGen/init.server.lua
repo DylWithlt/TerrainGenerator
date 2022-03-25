@@ -236,7 +236,6 @@ RunService.Heartbeat:Connect(function(dt)
         if tostring(currChunk) == tostring(lc) then continue end
         
         lc = currChunk
-        print(tostring(currChunk))
 
         if chunkTracker[tostring(currChunk)] then continue end
         chunkTracker[tostring(currChunk)] = true
