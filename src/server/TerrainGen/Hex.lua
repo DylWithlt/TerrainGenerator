@@ -49,7 +49,7 @@ return function(size, pointyUp)
 		
 		setmetatable(self, {
 			__tostring = function(tbl)
-				return string.format("%s %s %s", math.floor(self.q), math.floor(self.r), math.floor(self.s))
+				return string.format("%s %s %s", math.floor(tbl.q), math.floor(tbl.r), math.floor(tbl.s))
 			end
 		})
 

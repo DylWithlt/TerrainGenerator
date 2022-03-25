@@ -6,10 +6,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RNG = Random.new()
 
 -- Terrain Specific Settings
-local SIZE = 3
+local SIZE = 4
 
 local CHUNK_SIZE = 21 -- MUST BE ODD
 if CHUNK_SIZE % 2 == 0 then error("TerrainGen Chunk_SIZE can't be even.") return end
+local RENDER_DISTANCE = 5
 
 local smoothness = 0.005
 
@@ -19,7 +20,8 @@ local HexFactory = require(script.Hex)
 local Hex = HexFactory(SIZE)
 local ChunkHex = HexFactory(SIZE * CHUNK_SIZE, true)
 
-local CHUNK_R = math.ceil(CHUNK_SIZE/2) + 1
+local CHUNK_R = math.floor(ChunkHex.h / Hex.w)
+print(CHUNK_R)
 
 local hexagon = ReplicatedStorage:WaitForChild("Hexagon")
 
@@ -107,7 +109,7 @@ end
 local elevations, moistures, evaps = 5, 8, 8
 
 local function getBiome(e, m, ev)
-    e = (e - 0.4)
+    e = (e - 0.4)/(1-.4)
     if e <= 0 then return biomes.OCEAN end
     if e < 0.05 then return biomes.DESERT end
 
@@ -141,7 +143,7 @@ end
 local function getHeight(e)
     --return math.round((math.max(e, .4) * 200) / 4)* 4
 
-    return math.pow(math.max(e, .4) * 100, 1.2)
+    return math.pow(math.max(e, .4) * 50, 1.7)
 end
 
 local height_seed = RNG:NextNumber()
@@ -150,24 +152,26 @@ local temp_seed = RNG:NextNumber()
 
 local function getHeightMap(hex)
     return makeNoiseMap(hex, {
+        {2, .05},
         {1, .5},
         {.5, 2},
         {.25, 4},
-        {.1, 16}
+        {.1, 16},
+        {.05, 32}
     }, height_seed)
 end
 
 local function getMoistureMap(hex)
     return makeNoiseMap(hex, {
-        {2, .5},
-        {0.5, 16}
+        {2, 1},
+        {0.5, 8}
     }, moisture_seed)
 end
 
 local function getEvapMap(hex)
     return makeNoiseMap(hex, {
-        {2, .5},
-        {0.5, 16}
+        {2, 1},
+        {0.5, 8}
     }, temp_seed)
 end
 
@@ -201,15 +205,13 @@ end
 
 local chunkTracker = {}
 
-local function checkChunkHex(cHex)
-    return chunkTracker[tostring(cHex)]
-end
-
 local function generateChunk(chunkHex)
-    local centerHex = getChunkCenterAsHex(chunkHex)
+    local centerHex = getChunkCenterAsHex(ChunkHex.hex_round(chunkHex))
 
-    if checkChunkHex(chunkHex) then return end
-    chunkTracker[chunkHex] = true
+    if chunkTracker[tostring(chunkHex)] then return end
+    chunkTracker[tostring(chunkHex)] = true
+    print(chunkHex)
+    visualizeChunk(chunkHex)
 
     local spiral = Hex.hex_spiral(centerHex, CHUNK_R)
     for _, hex in ipairs(spiral) do
@@ -235,13 +237,10 @@ RunService.Heartbeat:Connect(function(dt)
 
         if tostring(currChunk) == tostring(lc) then continue end
         
-        lc = currChunk
-
-        if chunkTracker[tostring(currChunk)] then continue end
-        chunkTracker[tostring(currChunk)] = true
+        lastChunk[player] = currChunk
 
         print("Spiraling")
-        local neighbors = ChunkHex.hex_spiral(currChunk, 1)
+        local neighbors = ChunkHex.hex_spiral(currChunk, RENDER_DISTANCE)
         for _, chunk in ipairs(neighbors) do
             generateChunk(chunk)
         end
@@ -250,4 +249,10 @@ end)
 
 generateChunk(ChunkHex.new(0,0))
 
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid")
+        hum.WalkSpeed = 100
+    end)
+end)
 
