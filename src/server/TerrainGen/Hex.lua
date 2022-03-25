@@ -1,5 +1,3 @@
-local Hex = {}
-
 local sqrt_3 = math.sqrt(3)
 
 local Orientation = {}
@@ -21,9 +19,9 @@ local M = Orientation.new(
 	3.0/2.0, 0.0, sqrt_3/ 2.0, sqrt_3,
 	2.0/3.0, 0.0, -1.0/3.0, sqrt_3/3.0, 0.0)
 
+local Hex = {}
 Hex.layout = {}
 
-local Hex = {}
 function Hex.new(q, r, s)
 	return {
 		q = q;
